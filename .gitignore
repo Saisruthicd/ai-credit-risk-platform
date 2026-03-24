@@ -17,3 +17,6 @@ y
 git add .
 git commit -m "Initial project setup with folder structure"
 
+.DS_Store
+data/*.csv
+data/*.zip
