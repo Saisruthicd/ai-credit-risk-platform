@@ -10,14 +10,14 @@ transactions, built to production standards with a REST API.
 
 ---
 
-## 🎯 Problem
+## Problem
 
 Only 0.17% of transactions are fraudulent — extreme class 
 imbalance means standard ML approaches fail completely.
 
 ---
 
-## 📊 Results
+## Results
 
 | Model | ROC-AUC | Fraud Recall | Precision |
 |---|---|---|---|
@@ -29,7 +29,7 @@ precision and recall for real-world deployment.
 
 ---
 
-## 🔑 Key Technical Decisions
+## Key Technical Decisions
 
 - **SMOTE on training data only** — prevents data leakage
 - **Recall optimised over accuracy** — missing fraud costs more
@@ -38,7 +38,7 @@ precision and recall for real-world deployment.
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Tools |
 |---|---|
@@ -51,7 +51,7 @@ precision and recall for real-world deployment.
 
 ---
 
-## 🚀 Run Locally
+## Run Locally
 ```bash
 pip install -r requirements.txt
 uvicorn api.main:app --reload
@@ -61,7 +61,7 @@ API docs: http://localhost:8000/docs
 
 ---
 
-## 📡 Sample API Response
+##  Sample API Response
 ```json
 {
   "prediction": 0,
@@ -72,9 +72,9 @@ API docs: http://localhost:8000/docs
 
 ---
 
-## 👩‍💻 Author
+## Author
 
 **Saisruthi Catari Dinesh**
-First Class BSc Computer Science, University of Greenwich
+Data Engineer
 [LinkedIn](https://linkedin.com/in/saisruthicataridinesh) | 
 [GitHub](https://github.com/Saisruthicd)
