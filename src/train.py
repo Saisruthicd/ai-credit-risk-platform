@@ -19,12 +19,12 @@ def train():
     mlflow.set_experiment("fraud_detection")
 
     for name, model in models.items():
-        print(f"\n�� Training {name}...")
+        print(f"\n Training {name}...")
         with mlflow.start_run(run_name=name):
             model.fit(X_train, y_train)
             joblib.dump(model, f"models/{name}.pkl")
             mlflow.sklearn.log_model(model, name)
-            print(f"✅ {name} trained and saved to models/")
+            print(f"{name} trained and saved to models/")
 
 if __name__ == "__main__":
     train()
