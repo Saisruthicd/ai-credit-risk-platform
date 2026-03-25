@@ -26,7 +26,7 @@ def evaluate():
         plt.title(f"ROC Curve - {name}")
         plt.savefig(f"models/{name}_roc.png")
         plt.close()
-        print(f"✅ ROC curve saved to models/{name}_roc.png")
+        print(f"ROC curve saved to models/{name}_roc.png")
 
 if __name__ == "__main__":
     evaluate()
