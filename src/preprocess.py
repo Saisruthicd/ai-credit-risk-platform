@@ -5,7 +5,7 @@ from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import SMOTE
 
 def preprocess(path="data/creditcard.csv"):
-    print("📂 Loading data...")
+    print("Loading data...")
     df = pd.read_csv(path)
     print(f"Loaded {len(df):,} transactions")
     print(f"Fraud cases: {df['Class'].sum():,} ({df['Class'].mean()*100:.2f}%)")
@@ -24,7 +24,7 @@ def preprocess(path="data/creditcard.csv"):
     )
 
     # Apply SMOTE only on training data
-    print("⚙️  Applying SMOTE to handle class imbalance...")
+    print("Applying SMOTE to handle class imbalance...")
     smote = SMOTE(random_state=42)
     X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
 
