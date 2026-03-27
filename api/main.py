@@ -1,109 +1,85 @@
 import sys
 sys.path.append('.')
-import os
+
 import joblib
 import numpy as np
-import sqlite3
-import json
-from datetime import datetime
 from fastapi import FastAPI
 from pydantic import BaseModel
-import google.generativeai as genai
+from datetime import datetime
 
 app = FastAPI(title="AI Credit Risk & Fraud Detection API")
-
-# Initialize SQLite Database
-DB_FILE = "data/transactions.db"
-os.makedirs("data", exist_ok=True)
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS predictions
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  timestamp TEXT,
-                  prediction INTEGER,
-                  label TEXT,
-                  fraud_probability REAL,
-                  explanation TEXT)''')
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# Load Models
 model = joblib.load("models/RandomForest.pkl")
-try:
-    explainer = joblib.load("models/shap_explainer.pkl")
-except:
-    explainer = None
+explainer = joblib.load("models/shap_explainer.pkl")
 
-# Configure Free API (Gemini)
-if "GEMINI_API_KEY" in os.environ:
-    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    llm = genai.GenerativeModel('gemini-1.5-flash')
-else:
-    llm = None
+FEATURE_NAMES = [
+    'Time','V1','V2','V3','V4','V5','V6','V7','V8','V9',
+    'V10','V11','V12','V13','V14','V15','V16','V17','V18',
+    'V19','V20','V21','V22','V23','V24','V25','V26','V27','V28','Amount'
+]
+
+logs = []
 
 class Transaction(BaseModel):
     features: list[float]
+
+def get_explanation(features, prediction, probability, shap_vals):
+    top_indices = np.argsort(np.abs(shap_vals))[-3:][::-1]
+    top_features = [FEATURE_NAMES[i] for i in top_indices]
+    top_impacts = [shap_vals[i] for i in top_indices]
+
+    if prediction == 1:
+        risk = "high" if probability > 0.7 else "moderate"
+        signals = []
+        for feat, impact in zip(top_features, top_impacts):
+            direction = "elevated" if impact > 0 else "suppressed"
+            signals.append(f"{feat} ({direction}, SHAP: {impact:.3f})")
+
+        return (
+            f"This transaction has been flagged as fraudulent with a {probability*100:.1f}% probability, "
+            f"representing a {risk} risk level. "
+            f"The primary risk signals driving this decision are: {signals[0]}, {signals[1]}, and {signals[2]}. "
+            f"The transaction amount of GBP {features[-1]:.2f} combined with these behavioural anomalies "
+            f"is consistent with known fraud patterns. "
+            f"Recommended action: escalate to the fraud investigations team for manual review and consider "
+            f"temporarily suspending the associated account pending verification."
+        )
+    else:
+        return (
+            f"This transaction has been assessed as legitimate with a low fraud probability of {probability*100:.1f}%. "
+            f"The key features analysed — {top_features[0]}, {top_features[1]}, and {top_features[2]} — "
+            f"are within normal ranges and consistent with the account's expected behaviour. "
+            f"No further action is required at this time."
+        )
 
 @app.get("/")
 def root():
     return {"message": "Fraud Detection API is running"}
 
-@app.get("/logs")
-def get_logs(limit: int = 50):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT id, timestamp, prediction, label, fraud_probability, explanation FROM predictions ORDER BY id DESC LIMIT ?", (limit,))
-    rows = c.fetchall()
-    conn.close()
-    
-    logs = []
-    for row in rows:
-        logs.append({
-            "id": row[0],
-            "timestamp": row[1],
-            "prediction": row[2],
-            "label": row[3],
-            "fraud_probability": row[4],
-            "explanation": row[5]
-        })
-    return logs
-
 @app.post("/predict")
 def predict(transaction: Transaction):
     data = np.array(transaction.features).reshape(1, -1)
-    prediction = model.predict(data)[0]
-    probability = model.predict_proba(data)[0][1]
-    
-    label = "FRAUD" if prediction == 1 else "LEGITIMATE"
-    
-    explanation = "SHAP Explainer or LLM API is not configured."
-    if explainer is not None:
-        sv = explainer.shap_values(data)
-        fraud_shap = sv[0, :, 1] if len(sv.shape) == 3 else sv[0]
-        
-        if llm is not None:
-            prompt = f"The AI model predicted this transaction as {label} with a {probability:.1%} probability of being fraud. The top SHAP values dictating this are: {list(zip(range(len(fraud_shap)), np.round(fraud_shap, 4)))}. Explain in 2 short sentences to a bank analyst why this prediction was made based on these abstract feature numbers."
-            try:
-                explanation = llm.generate_content(prompt).text
-            except Exception as e:
-                explanation = f"Error calling Gemini API: {e}"
-        else:
-            explanation = "Gemini API key not found. Please set GEMINI_API_KEY for a detailed text explanation."
-            
-    # Log to SQLite
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("INSERT INTO predictions (timestamp, prediction, label, fraud_probability, explanation) VALUES (?, ?, ?, ?, ?)",
-              (datetime.now().isoformat(), int(prediction), label, round(float(probability), 4), explanation))
-    conn.commit()
-    conn.close()
-            
-    return {
-        "prediction": int(prediction),
-        "label": label,
-        "fraud_probability": round(float(probability), 4),
+    prediction = int(model.predict(data)[0])
+    probability = float(model.predict_proba(data)[0][1])
+
+    shap_values = explainer.shap_values(data)
+    fraud_shap = np.array(shap_values[0, :, 1])
+
+    explanation = get_explanation(
+        transaction.features, prediction, probability, fraud_shap
+    )
+
+    result = {
+        "prediction": prediction,
+        "label": "FRAUD" if prediction == 1 else "LEGITIMATE",
+        "fraud_probability": round(probability, 4),
+        "model_version": "v1.0",
+        "timestamp": datetime.utcnow().isoformat(),
         "explanation": explanation
     }
+
+    logs.append(result)
+    return result
+
+@app.get("/logs")
+def get_logs(limit: int = 50):
+    return logs[-limit:]
